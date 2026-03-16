@@ -1896,6 +1896,14 @@ def send_sms_alert():
                 }
             })
 
+        if not phone_number.startswith('+'):
+            print(f"DEBUG: Formatting phone number {phone_number}")
+            if phone_number.startswith('91') and len(phone_number) == 12:
+                phone_number = '+' + phone_number
+            elif len(phone_number) == 10:
+                phone_number = '+91' + phone_number
+        
+        print(f"DEBUG: Attempting to send SMS to {phone_number} from {TWILIO_PHONE_NUMBER}")
         client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
         
         # Build message body
@@ -1910,16 +1918,18 @@ def send_sms_alert():
             to=phone_number
         )
 
+        print(f"DEBUG: SMS Sent! SID: {message.sid}")
         return jsonify({
             'success': True,
             'message': 'SMS alert sent successfully',
             'message_sid': message.sid
         })
     except Exception as e:
-        print(f"ERROR: Twilio SMS failed: {str(e)}")
+        error_msg = str(e)
+        print(f"ERROR: Twilio SMS failed: {error_msg}")
         return jsonify({
             'success': False,
-            'error': f'Failed to send SMS: {str(e)}'
+            'error': f'Twilio Error: {error_msg}'
         }), 500
 
 @app.route('/api/ml/health', methods=['GET'])
