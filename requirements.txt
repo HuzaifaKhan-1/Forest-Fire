@@ -1,0 +1,12 @@
+flask
+flask-cors
+numpy
+requests
+tensorflow
+pandas
+scikit-learn
+matplotlib
+seaborn
+shap
+plotly
+python-dotenv

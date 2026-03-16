@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Visualization v7 - NeuroNix</title>
+    <!-- Dependencies -->
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css?v=7.0">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <!-- Core Engine Scripts -->
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <style>
+        #mapbox-container {
+            width: 100%; height: 750px; border-radius: 20px; overflow: hidden;
+            border: 2px solid rgba(255, 69, 0, 0.3); background-color: #010409;
+            z-index: 10; position: relative;
+        }
+        .map-loading-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; align-items: center; justify-content: center;
+            background: #010409; color: #ef4444; z-index: 999; transition: opacity 0.5s;
+        }
+        .status-badge {
+            padding: 6px 14px; border-radius: 20px; font-size: 11px;
+            font-weight: 600; display: inline-flex; align-items: center; gap: 8px;
+            backdrop-filter: blur(10px);
+        }
+        .status-badge.online { background: rgba(74, 222, 128, 0.2); color: #4ade80; border: 1px solid rgba(74, 222, 128, 0.3); }
+        .status-badge.offline { background: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); }
+        .error-card {
+            background: rgba(20, 20, 25, 0.95); padding: 30px; border-radius: 20px;
+            border: 1px solid rgba(239, 68, 68, 0.3); text-align: center; max-width: 400px;
+        }
+    </style>
+</head>
+<body>
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-logo">
+                <div class="brand"><i class="fas fa-fire-flame-curved"></i> NeuroNix</div>
+                <div class="sidebar-tagline">Forest Fire Intelligence Platform</div>
+            </div>
+        </div>
+        <nav class="sidebar-nav">
+             <div class="nav-section">
+                <div class="nav-section-title">Core Features</div>
+                <a href="index.html" class="sidebar-nav-link"><i class="fas fa-home"></i> <span>Dashboard</span></a>
+                <a href="risk-analysis.html" class="sidebar-nav-link"><i class="fas fa-chart-line"></i> <span>Risk Assessment</span></a>
+                <a href="simulation.html" class="sidebar-nav-link"><i class="fas fa-fire"></i> <span>Fire Simulation</span></a>
+                <a href="optimization.html" class="sidebar-nav-link"><i class="fas fa-route"></i> <span>Resource Planning</span></a>
+            </div>
+            <div class="nav-section">
+                <div class="nav-section-title">Monitoring & Analysis</div>
+                <a href="monitoring.html" class="sidebar-nav-link"><i class="fas fa-satellite-dish"></i> <span>Live Monitoring</span></a>
+                <a href="visualization.html" class="sidebar-nav-link active"><i class="fas fa-cube"></i> <span>3D Visualization</span></a>
+                <a href="analytics.html" class="sidebar-nav-link"><i class="fas fa-chart-bar"></i> <span>Data Analytics</span></a>
+            </div>
+        </nav>
+    </aside>
+
+    <header class="fixed-header">
+        <div class="header-container">
+            <div class="header-controls">
+                <div id="ml-engine-status" class="status-badge offline">
+                    <i class="fas fa-satellite"></i> <span>Connecting to AI Engine...</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <section class="section">
+        <div class="section-header">
+            <h2>FireVision 3D - High Precision Imagery</h2>
+            <p>Real-time Terrain analysis (India Focus)</p>
+        </div>
+        <div class="section-content" style="position: relative;">
+            <div id="map-loader" class="map-loading-overlay">
+                <div id="loader-content" class="text-center">
+                    <i class="fas fa-circle-notch fa-spin" style="font-size: 40px; color: #ff4500;"></i>
+                    <div style="margin-top:20px; font-weight: 500;">Syncing Satellite Data...</div>
+                </div>
+                <div id="error-screen" class="error-card" style="display: none;">
+                    <i class="fas fa-shield-alt" style="font-size: 40px; color: #ef4444; margin-bottom: 20px;"></i>
+                    <h3 style="margin-bottom: 10px;">Access Authorization Required</h3>
+                    <p style="font-size: 13px; opacity: 0.8; margin-bottom: 20px;">
+                        The current security token is blocked by the browser or has expired. 
+                        Please try the alternative key below.
+                    </p>
+                    <button onclick="rotateKey()" style="background:#ff4500; color:white; border:none; padding:12px 24px; border-radius:10px; cursor:pointer; font-weight:600; width: 100%;">
+                        <i class="fas fa-key"></i> Switch to Backup License Key
+                    </button>
+                    <div style="margin-top: 15px; font-size: 11px; opacity: 0.5;">Attempt Slot: <span id="slot-display">1</span></div>
+                </div>
+            </div>
+            <div id="mapbox-container"></div>
+        </div>
+    </section>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+    <script src="script.js?v=7.0"></script>
+    <script>
+        let mapboxToken = 'YOUR_MAPBOX_TOKEN_PLACEHOLDER';
+
+        window.addEventListener('load', async () => {
+            // 1. Backend Handshake & Config
+            try {
+                const configRes = await fetch('http://127.0.0.1:5001/api/config');
+                const configData = await configRes.json();
+                if (configData.mapbox_token) {
+                    mapboxToken = configData.mapbox_token;
+                }
+                
+                const res = await fetch('http://127.0.0.1:5001/').catch(() => null);
+                const badge = document.getElementById('ml-engine-status');
+                if (res && res.ok) {
+                    badge.className = 'status-badge online';
+                    badge.innerHTML = '<i class="fas fa-check-circle"></i> AI Engine Live (5001)';
+                } else {
+                    badge.innerHTML = '<i class="fas fa-exclamation-triangle"></i> AI Engine Port Mismatch';
+                }
+            } catch(e) {}
+
+            // 2. Mapbox Setup
+            if (!mapboxgl.supported()) { alert("WebGL Restricted"); return; }
+            
+            mapboxgl.accessToken = mapboxToken;
+            
+            try {
+                const map = new mapboxgl.Map({
+                    container: 'mapbox-container',
+                    style: 'mapbox://styles/mapbox/satellite-v9', // Satellite is the most robust style
+                    center: [78.9629, 20.5937], 
+                    zoom: 4.5, pitch: 45, antialias: true
+                });
+
+                map.on('style.load', () => {
+                    document.getElementById('map-loader').style.opacity = '0';
+                    setTimeout(() => document.getElementById('map-loader').style.display = 'none', 500);
+                });
+
+                map.on('error', (e) => {
+                    console.error('SECURE_CORE_ERROR:', e);
+                    document.getElementById('loader-content').style.display = 'none';
+                    document.getElementById('error-screen').style.display = 'block';
+                });
+
+                map.on('load', () => {
+                    // Optimized Dem
+                    try {
+                        map.addSource('mapbox-dem', { 'type': 'raster-dem', 'url': 'mapbox://mapbox.mapbox-terrain-dem-v1', 'tileSize': 512 });
+                        map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.5 });
+                    } catch(err) {}
+
+                    // FIRMS API Fetch
+                    fetch('http://127.0.0.1:5001/api/ml/firms')
+                        .then(r => r.json())
+                        .then(data => {
+                            if (data.success && data.hotspots) {
+                                const features = data.hotspots.map(h => ({
+                                    'type': 'Feature',
+                                    'geometry': { 'type': 'Point', 'coordinates': [parseFloat(h.longitude), parseFloat(h.latitude)] }
+                                }));
+                                map.addSource('fire-data', { 'type': 'geojson', 'data': { 'type': 'FeatureCollection', 'features': features } });
+                                map.addLayer({
+                                    'id': 'fire-layer', 'type': 'circle', 'source': 'fire-data',
+                                    'paint': { 'circle-radius': 8, 'circle-color': '#ff0000', 'circle-stroke-width': 1, 'circle-stroke-color': '#fff' }
+                                });
+                            }
+                        })
+                        .catch(() => console.warn('Real-time feed connection limited'));
+                });
+
+            } catch(err) {
+                console.error('INIT_CRITICAL:', err);
+            }
+        });
+    </script>
+</body>
+</html>
