@@ -22,6 +22,9 @@ TWILIO_ACCOUNT_SID = os.getenv('TWILIO_ACCOUNT_SID')
 TWILIO_AUTH_TOKEN = os.getenv('TWILIO_AUTH_TOKEN')
 TWILIO_PHONE_NUMBER = os.getenv('TWILIO_PHONE_NUMBER', '+18632772307')
 
+print(f"DEBUG: SID loaded: {TWILIO_ACCOUNT_SID[:5]}...")
+print(f"DEBUG: Token loaded: {TWILIO_AUTH_TOKEN[:5]}...")
+
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 
@@ -1913,6 +1916,7 @@ def send_sms_alert():
             'message_sid': message.sid
         })
     except Exception as e:
+        print(f"ERROR: Twilio SMS failed: {str(e)}")
         return jsonify({
             'success': False,
             'error': f'Failed to send SMS: {str(e)}'
