@@ -584,6 +584,7 @@ function addRiskZones() {
             </div>
         `);
     });
+}
 // Restoration of core geofencing and risk calculation logic
 function calculateRiskLevel(temperature, humidity, windSpeed) {
     const tempScore = Math.min(40, Math.max(0, (temperature - 20) * 2));
@@ -2032,7 +2033,24 @@ function initializeMapSearch() {
         // Clean and normalize query
         const cleanQuery = query.toLowerCase().trim();
 
-        // Search for location
+        // 1. Search for local elements on current page (high priority for "anywhere" functionality)
+        const headings = Array.from(document.querySelectorAll('h1, h2, h3, h4, .card-title, .stat-label, .nav-link'));
+        const matchingHeading = headings.find(h => h.textContent.toLowerCase().includes(cleanQuery));
+        if (matchingHeading) {
+            matchingHeading.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            matchingHeading.style.transition = 'all 0.5s ease';
+            matchingHeading.style.color = '#ff4444';
+            matchingHeading.style.transform = 'scale(1.1)';
+            setTimeout(() => {
+                matchingHeading.style.color = '';
+                matchingHeading.style.transform = '';
+            }, 2000);
+            showToast(`Navigated to: ${matchingHeading.textContent.trim()}`, 'success');
+            if (searchInput) searchInput.value = '';
+            return;
+        }
+
+        // 2. Search for location in internal database
         const searchResult = fuzzySearch(cleanQuery);
 
         if (searchResult) {
@@ -8298,4 +8316,15 @@ async function updateDashboardExplainability() {
         console.error('Error fetching AI explainability:', error);
     }
 }
+
+function getDistrictPopulation(district) {
+    const populations = {
+        'Nainital District': '954,605',
+        'Almora District': '622,506',
+        'Dehradun District': '1,696,694',
+        'Haridwar District': '1,890,422',
+        'Pauri Garhwal District': '687,271',
+        'Chamoli District': '391,605'
+    };
+    return populations[district] || '500,000+';
 }
