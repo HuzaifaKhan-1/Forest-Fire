@@ -116,33 +116,42 @@
         <div class="dashboard-overview">
             <div class="overview-stats">
                 <div class="stat-card">
-                    <div class="stat-icon">
+                    <div class="stat-icon" style="background: rgba(59, 130, 246, 0.2); color: #3b82f6;">
+                        <i class="fas fa-thermometer-half"></i>
+                    </div>
+                    <div class="stat-info">
+                        <div class="stat-number" id="live-temp">34°C</div>
+                        <div class="stat-label">Live Temperature</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: rgba(16, 185, 129, 0.2); color: #10b981;">
+                        <i class="fas fa-tint"></i>
+                    </div>
+                    <div class="stat-info">
+                        <div class="stat-number" id="live-humidity">32%</div>
+                        <div class="stat-label">Relative Humidity</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: rgba(245, 158, 11, 0.2); color: #f59e0b;">
+                        <i class="fas fa-wind"></i>
+                    </div>
+                    <div class="stat-info">
+                        <div class="stat-number" id="live-wind">22 km/h</div>
+                        <div class="stat-label">Wind Velocity</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: rgba(239, 68, 68, 0.2); color: #ef4444;">
                         <i class="fas fa-crosshairs"></i>
                     </div>
                     <div class="stat-info">
-                        <div class="stat-number">97.2%</div>
-                        <div class="stat-label">Prediction Accuracy</div>
+                        <div class="stat-number" id="live-accuracy">97.2%</div>
+                        <div class="stat-label">Model Accuracy</div>
+                        <div style="font-size: 10px; color: #94a3b8; margin-top: 4px;" id="last-sync-time">Last synced: Just now</div>
                     </div>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-icon">
-                        <i class="fas fa-clock"></i>
-                    </div>
-                    <div class="stat-info">
-                        <div class="stat-number">24/7</div>
-                        <div class="stat-label">Monitoring</div>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon">
-                        <i class="fas fa-map"></i>
-                    </div>
-                    <div class="stat-info">
-                        <div class="stat-number">807,276</div>
-                        <div class="stat-label">km² Global Forest Coverage</div>
-                    </div>
-                </div>
-
             </div>
 
             <!-- Feature Navigation Cards -->
@@ -452,7 +461,7 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-    <script src="script.js?v=5.0"></script>
+    <script src="script.js?v=7.0"></script>
 </body>
 
 </html>

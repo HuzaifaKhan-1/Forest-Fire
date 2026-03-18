@@ -14,6 +14,7 @@ console.log('🛰️ AI Engine V5.0 Handshake: SUCCESS at', ML_API_BASE);
 let mlPredictions = {};
 let realTimeUpdates = false;
 let currentOptimization = null;
+let currentSearchLocation = null; // Track current user-searched location for real-time risk updates
 
 // Initialize the dashboard
 document.addEventListener('DOMContentLoaded', function () {
@@ -583,150 +584,11 @@ function addRiskZones() {
             </div>
         `);
     });
-}
-
-// Helper function to get district population (simulated data)
-function getDistrictPopulation(districtName) {
-    const populations = {
-        'Nainital District': '955,128',
-        'Almora District': '622,506',
-        'Dehradun District': '1,696,694',
-        'Haridwar District': '1,890,422',
-        'Pauri Garhwal District': '687,271',
-        'Chamoli District': '391,605'
-    };
-    return populations[districtName] || 'Data not available';
-}
-
-// Update risk zones for searched location
-async function updateRiskZonesForLocation(locationName, lat, lng) {
-    if (!riskMap) return;
-
-    // Clear existing risk zones
-    riskMap.eachLayer(layer => {
-        if (layer instanceof L.Polygon) {
-            riskMap.removeLayer(layer);
-        }
-    });
-
-    try {
-        // Fetch risk data for the new location
-        const riskData = await fetchLocationRiskData(locationName, lat, lng);
-
-        // Create risk zones around the searched location
-        const riskZones = generateRiskZonesForLocation(locationName, lat, lng, riskData);
-
-        riskZones.forEach(zone => {
-            const polygon = L.polygon(zone.coords, {
-                color: zone.color,
-                fillColor: zone.color,
-                fillOpacity: 0.4,
-                weight: 2
-            }).addTo(riskMap);
-
-            polygon.bindPopup(`
-                <div class="location-risk-popup">
-                    <h4>${zone.name}</h4>
-                    <p>Risk Level: ${zone.risk.replace('-', ' ').toUpperCase()}</p>
-                    <p>Temperature: ${zone.temperature}Â°C</p>
-                    <p>Humidity: ${zone.humidity}%</p>
-                    <p>Wind Speed: ${zone.windSpeed} km/h</p>
-                </div>
-            `);
-        });
-
-        // Update the risk panel with new location data
-        updateRiskPanelForLocation(locationName, riskData);
-
-        showToast(`Risk analysis updated for ${locationName}`, 'success');
-
-    } catch (error) {
-        console.error('Failed to update risk zones:', error);
-        showToast('Failed to fetch risk data for location', 'error');
-    }
-}
-
-// Fetch risk data for a specific location
-async function fetchLocationRiskData(locationName, lat, lng) {
-    try {
-        const response = await fetch(`${ML_API_BASE}/api/ml/location-risk`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                location_name: locationName,
-                latitude: lat,
-                longitude: lng
-            })
-        });
-
-        if (response.ok) {
-            const data = await response.json();
-            return data.risk_data;
-        }
-    } catch (error) {
-        console.warn('ML API not available, using simulated data');
-    }
-
-    // Fallback to simulated data
-    return generateSimulatedRiskData(locationName, lat, lng);
-}
-
-// Generate simulated risk data for any location
-function generateSimulatedRiskData(locationName, lat, lng) {
-    // Generate realistic variations based on location
-    const baseTemp = 25 + Math.random() * 15; // 25-40Â°C
-    const baseHumidity = 30 + Math.random() * 40; // 30-70%
-    const baseWind = 5 + Math.random() * 20; // 5-25 km/h
-
-    // Different risk levels for surrounding areas
-    return {
-        center: {
-            temperature: baseTemp + Math.random() * 5,
-            humidity: baseHumidity - Math.random() * 10,
-            windSpeed: baseWind + Math.random() * 5,
-            riskLevel: calculateRiskLevel(baseTemp, baseHumidity, baseWind)
-        },
-        surrounding: [
-            {
-                name: `${locationName} North`,
-                temperature: baseTemp + Math.random() * 3,
-                humidity: baseHumidity + Math.random() * 8,
-                windSpeed: baseWind + Math.random() * 3,
-                offset: { lat: 0.05, lng: 0 }
-            },
-            {
-                name: `${locationName} South`,
-                temperature: baseTemp - Math.random() * 2,
-                humidity: baseHumidity + Math.random() * 5,
-                windSpeed: baseWind - Math.random() * 2,
-                offset: { lat: -0.05, lng: 0 }
-            },
-            {
-                name: `${locationName} East`,
-                temperature: baseTemp + Math.random() * 4,
-                humidity: baseHumidity - Math.random() * 6,
-                windSpeed: baseWind + Math.random() * 4,
-                offset: { lat: 0, lng: 0.05 }
-            },
-            {
-                name: `${locationName} West`,
-                temperature: baseTemp - Math.random() * 1,
-                humidity: baseHumidity + Math.random() * 7,
-                windSpeed: baseWind - Math.random() * 3,
-                offset: { lat: 0, lng: -0.05 }
-            }
-        ]
-    };
-}
-
-// Calculate risk level based on environmental factors
+// Restoration of core geofencing and risk calculation logic
 function calculateRiskLevel(temperature, humidity, windSpeed) {
     const tempScore = Math.min(40, Math.max(0, (temperature - 20) * 2));
     const humidityScore = Math.min(40, Math.max(0, (80 - humidity) * 0.5));
     const windScore = Math.min(20, Math.max(0, windSpeed));
-
     const totalScore = tempScore + humidityScore + windScore;
 
     if (totalScore > 70) return 'very-high';
@@ -735,90 +597,177 @@ function calculateRiskLevel(temperature, humidity, windSpeed) {
     return 'low';
 }
 
-// Generate risk zones around a location with proper district-like boundaries
 function generateRiskZonesForLocation(locationName, lat, lng, riskData) {
     const zones = [];
     const riskColors = {
         'very-high': '#ff4444',
         'high': '#ffa726',
         'moderate': '#66bb6a',
-        'low': '#4fc3f7'
+        'low': '#4fc3f7',
+        'very-low': '#81c784',
+        'none': 'rgba(100, 150, 255, 0.3)'
     };
 
-    // Create realistic district-sized boundaries
-    const districtSize = 0.15; // Larger area coverage
+    const districtSize = 0.12 + Math.random() * 0.06;
     const centerRisk = riskData.center;
 
-    // Generate organic boundary shape for main district
-    const mainDistrictCoords = generateOrganicBoundary(lat, lng, districtSize, 20);
-    zones.push({
-        name: `${locationName} District`,
-        coords: mainDistrictCoords,
-        risk: centerRisk.riskLevel,
-        color: riskColors[centerRisk.riskLevel],
-        temperature: Math.round(centerRisk.temperature),
-        humidity: Math.round(centerRisk.humidity),
-        windSpeed: Math.round(centerRisk.windSpeed)
-    });
+    if (centerRisk.isLand) {
+        const mainDistrictCoords = generateOrganicBoundary(lat, lng, districtSize, 24);
+        zones.push({
+            name: `${locationName} District`,
+            coords: mainDistrictCoords,
+            risk: centerRisk.riskLevel,
+            color: riskColors[centerRisk.riskLevel] || '#4fc3f7',
+            temperature: Math.round(centerRisk.temperature),
+            humidity: Math.round(centerRisk.humidity),
+            windSpeed: Math.round(centerRisk.windSpeed),
+            isHot: centerRisk.active_hotspots > 0
+        });
+    }
 
-    // Create surrounding districts
-    const surroundingDistricts = [
-        { offset: { lat: 0.2, lng: 0.1 }, name: `${locationName} North District` },
-        { offset: { lat: -0.2, lng: 0.1 }, name: `${locationName} South District` },
-        { offset: { lat: 0.1, lng: 0.25 }, name: `${locationName} East District` },
-        { offset: { lat: 0.1, lng: -0.25 }, name: `${locationName} West District` }
-    ];
-
-    riskData.surrounding.slice(0, 4).forEach((area, index) => {
-        const district = surroundingDistricts[index];
-        if (!district) return;
-
-        const districtLat = lat + district.offset.lat;
-        const districtLng = lng + district.offset.lng;
-        const areaRisk = calculateRiskLevel(area.temperature, area.humidity, area.windSpeed);
-
+    const numSurrounding = riskData.surrounding.length;
+    for (let i = 0; i < numSurrounding; i++) {
+        const area = riskData.surrounding[i];
+        if (area.isLand === false) continue;
+        
+        const angle = (i / numSurrounding) * 2 * Math.PI + (Math.random() * 0.5);
+        const distance = districtSize * (1.5 + Math.random() * 0.8);
+        const districtLat = lat + Math.cos(angle) * distance;
+        const districtLng = lng + Math.sin(angle) * distance;
+        
+        const areaRisk = area.riskLevel || calculateRiskLevel(area.temperature, area.humidity, area.windSpeed);
         const districtCoords = generateOrganicBoundary(districtLat, districtLng, districtSize * 0.8, 16);
 
         zones.push({
-            name: district.name,
+            name: area.name,
             coords: districtCoords,
             risk: areaRisk,
-            color: riskColors[areaRisk],
+            color: area.hotspot_detected ? '#ff0000' : (riskColors[areaRisk] || '#4fc3f7'),
             temperature: Math.round(area.temperature),
             humidity: Math.round(area.humidity),
-            windSpeed: Math.round(area.windSpeed)
+            windSpeed: Math.round(area.windSpeed),
+            isHot: area.hotspot_detected
         });
-    });
-
+    }
     return zones;
 }
 
-// Generate organic, district-like boundaries
 function generateOrganicBoundary(centerLat, centerLng, baseRadius, points) {
     const coordinates = [];
     const angleStep = (2 * Math.PI) / points;
-
     for (let i = 0; i < points; i++) {
         const angle = i * angleStep;
-
-        // Add natural variation to radius (10-40% variation)
-        const radiusVariation = 0.7 + Math.random() * 0.6;
-        const radius = baseRadius * radiusVariation;
-
-        // Add small random offsets for more organic shape
-        const latOffset = Math.cos(angle) * radius + (Math.random() - 0.5) * 0.02;
-        const lngOffset = Math.sin(angle) * radius + (Math.random() - 0.5) * 0.02;
-
-        coordinates.push([
-            centerLat + latOffset,
-            centerLng + lngOffset
-        ]);
+        const noise = Math.sin(angle * 3) * 0.1 + Math.sin(angle * 5) * 0.05;
+        const radius = baseRadius * (0.8 + noise + (Math.random() * 0.25));
+        coordinates.push([centerLat + Math.cos(angle) * radius, centerLng + Math.sin(angle) * radius]);
     }
-
-    // Close the polygon
     coordinates.push(coordinates[0]);
-
     return coordinates;
+}
+
+function generateSimulatedRiskData(locationName, lat, lng) {
+    const baseTemp = 25 + Math.random() * 15;
+    const baseHumidity = 30 + Math.random() * 40;
+    const baseWind = 5 + Math.random() * 20;
+    return {
+        center: { temperature: baseTemp, humidity: baseHumidity, windSpeed: baseWind, riskLevel: 'moderate', isLand: true },
+        surrounding: []
+    };
+}
+
+// Main function to update risk zones when a location is searched
+async function updateRiskZonesForLocation(locationName, lat, lng, isAutoRefresh = false) {
+    if (!riskMap) return;
+
+    // Save for real-time automated updates
+    currentSearchLocation = { name: locationName, lat, lng };
+
+    try {
+        if (!isAutoRefresh) {
+            console.log(`🛰️ Fetching real-time forest risk for ${locationName}...`);
+        }
+        
+        const response = await fetch(`${ML_API_BASE}/api/ml/location-risk`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                location_name: locationName,
+                latitude: lat,
+                longitude: lng
+            })
+        });
+
+        const data = await response.json();
+        if (data.success) {
+            const riskData = data.risk_data;
+            
+            // Clear existing polygons from risk map
+            riskMap.eachLayer(layer => {
+                if (layer instanceof L.Polygon) {
+                    riskMap.removeLayer(layer);
+                }
+            });
+
+            // Generate and add New zones (filtered for land)
+            const zones = generateRiskZonesForLocation(locationName, lat, lng, riskData);            
+            zones.forEach(zone => {
+                const polygon = L.polygon(zone.coords, {
+                    color: zone.color,
+                    fillColor: zone.color,
+                    fillOpacity: zone.isHot ? 0.7 : 0.5,
+                    weight: zone.isHot ? 4 : 2,
+                    className: `risk-zone-polygon ${zone.isHot ? 'hotspot-pulse' : 'animate-pulse'}`
+                }).addTo(riskMap);
+
+                polygon.bindPopup(`
+                    <div class="risk-popup">
+                        <h4 style="color:${zone.color}">${zone.name}</h4>
+                        <div class="risk-popup-stats">
+                            <p><i class="fas fa-exclamation-triangle"></i> Risk: <b>${zone.risk.toUpperCase()}</b></p>
+                            <p><i class="fas fa-thermometer-half"></i> Temp: ${zone.temperature}°C</p>
+                            <p><i class="fas fa-tint"></i> Humidity: ${zone.humidity}%</p>
+                        </div>
+                    </div>
+                `);
+            });
+
+            // Update the side panel information
+            updateRiskPanelForLocation(locationName, riskData);
+            
+            if (!riskData.center.isLand) {
+                showToast(`Location is over water - assessing coastal perimeters`, 'info');
+            } else if (!isAutoRefresh) {
+                showToast(`Risk Analysis Updated for ${locationName}`, 'success');
+            }
+        } else {
+            throw new Error(data.error || 'Unknown API error: data.success was false');
+        }
+    } catch (error) {
+        console.error('Failed to update risk zones:', error);
+        // Fallback to simulated data if API fails
+        try {
+            const simulatedData = generateSimulatedRiskData(locationName, lat, lng);
+            // Clear map before fallback
+            riskMap.eachLayer(layer => {
+                if (layer instanceof L.Polygon) riskMap.removeLayer(layer);
+            });
+            const zones = generateRiskZonesForLocation(locationName, lat, lng, simulatedData);
+            zones.forEach(zone => {
+                L.polygon(zone.coords, {
+                    color: zone.color,
+                    fillColor: zone.color,
+                    fillOpacity: 0.5,
+                    weight: 2
+                }).addTo(riskMap);
+            });
+            updateRiskPanelForLocation(locationName, simulatedData);
+            if (!isAutoRefresh) {
+                showToast(`Using predictive simulation for ${locationName}`, 'info');
+            }
+        } catch (fallbackError) {
+            console.error('Fallback also failed:', fallbackError);
+        }
+    }
 }
 
 // Update risk panel with new location data
@@ -829,16 +778,59 @@ function updateRiskPanelForLocation(locationName, riskData) {
     // Clear existing risk items
     riskContainer.innerHTML = '';
 
-    // Add center area
+    // Center area
     const centerRisk = riskData.center;
-    addRiskItem(riskContainer, `${locationName} Center`, centerRisk.riskLevel, Math.round((100 - centerRisk.humidity + centerRisk.temperature + centerRisk.windSpeed) / 3));
+    if (centerRisk.isLand) {
+        const centerPercentage = Math.round((100 - centerRisk.humidity + centerRisk.temperature + centerRisk.windSpeed) / 3);
+        addRiskItem(riskContainer, `${locationName} Center`, centerRisk.riskLevel, centerPercentage);
+    } else {
+        const waterItem = document.createElement('div');
+        waterItem.className = 'risk-item water-area';
+        waterItem.style.borderLeft = '4px solid #3b82f6';
+        waterItem.innerHTML = `
+            <div class="risk-info">
+                <span class="risk-level" style="color: #60a5fa">WATER BODY</span>
+                <span class="risk-area">${locationName} Sea/Coastal</span>
+            </div>
+            <div class="risk-percentage">N/A</div>
+        `;
+        riskContainer.appendChild(waterItem);
+    }
 
-    // Add surrounding areas
-    riskData.surrounding.slice(0, 3).forEach(area => {
-        const areaRisk = calculateRiskLevel(area.temperature, area.humidity, area.windSpeed);
-        const riskPercentage = Math.round((100 - area.humidity + area.temperature + area.windSpeed) / 3);
-        addRiskItem(riskContainer, area.name, areaRisk, riskPercentage);
+    // Surrounding areas - only land ones
+    riskData.surrounding.filter(a => a.isLand).slice(0, 3).forEach(area => {
+        const areaPercentage = Math.round((100 - area.humidity + area.temperature + area.windSpeed) / 3);
+        addRiskItem(riskContainer, area.name, area.riskLevel, areaPercentage);
     });
+
+    // Update AI Explanation text
+    const explanationText = document.getElementById('explanation-text');
+    if (explanationText) {
+        if (centerRisk.isLand) {
+            explanationText.textContent = `"NeuroNix AI detects landmass at ${locationName}. Fire risk is ${centerRisk.riskLevel.replace('-', ' ')} based on local vegetation indicators and sensory climate data."`;
+        } else {
+            explanationText.textContent = `"The coordinates for ${locationName} fall within a water body. Forest fire risk is not applicable for sea/ocean regions. Monitoring coastal perimeter for shoreline vegetation risk instead."`;
+        }
+    }
+
+    // Update factor bars
+    updateFactorBars(centerRisk);
+}
+
+// Update factor breakdown bars in the risk analysis panel
+function updateFactorBars(risk) {
+    const windBar = document.querySelector('.factor-item:nth-child(1) .factor-percentage');
+    const dryBar = document.querySelector('.factor-item:nth-child(2) .factor-percentage');
+    
+    if (windBar) {
+        const windWeight = Math.min(95, Math.round((risk.windSpeed / 30) * 100));
+        windBar.textContent = windWeight + '%';
+    }
+    
+    if (dryBar) {
+        const drynessWeight = Math.min(95, Math.round(((100 - risk.humidity) / 80) * 100));
+        dryBar.textContent = drynessWeight + '%';
+    }
 }
 
 // Helper function to add risk item to panel
@@ -851,11 +843,11 @@ function addRiskItem(container, name, riskLevel, percentage) {
     };
 
     const riskItem = document.createElement('div');
-    riskItem.className = `risk-item ${riskClasses[riskLevel]}`;
+    riskItem.className = `risk-item ${riskClasses[riskLevel] || 'low-risk'}`;
     riskItem.innerHTML = `
         <div class="risk-color"></div>
         <div class="risk-info">
-            <span class="risk-level">${riskLevel.replace('-', ' ').toUpperCase()} Risk</span>
+            <span class="risk-level">${(riskLevel || 'low').replace('-', ' ').toUpperCase()} Risk</span>
             <span class="risk-area">${name}</span>
         </div>
         <div class="risk-percentage">${Math.min(95, Math.max(10, percentage))}%</div>
@@ -2279,14 +2271,28 @@ let explainabilityMap = null;
 
 // Start real-time data updates
 function startDataUpdates() {
-    setInterval(updateEnvironmentalData, 30000);
-    setInterval(updateAlerts, 60000);
+    setInterval(updateEnvironmentalData, 12000); // 12s for main stats
+    setInterval(updateAlerts, 45000);
     setInterval(updateTimeStamps, 60000);
     setInterval(updateChartData, 45000);
     setInterval(updateFireSpreadChart, 10000);
-    setInterval(updateActivityFeed, 45000);
+    setInterval(updateActivityFeed, 30000);
     setInterval(updateEnvironmentalConditions, 35000);
-    setInterval(updateRegionalCards, 40000);
+    setInterval(updateRegionalCards, 15000); // 15s for regional cards
+    setInterval(refreshActiveSearch, 15000); // 15s real-time risk polygon refresh
+}
+
+// Automatically refresh the polygons for the currently searched location
+async function refreshActiveSearch() {
+    if (currentSearchLocation && riskMap) {
+        console.log(`🔄 Real-time sync for ${currentSearchLocation.name}...`);
+        await updateRiskZonesForLocation(
+            currentSearchLocation.name, 
+            currentSearchLocation.lat, 
+            currentSearchLocation.lng, 
+            true
+        );
+    }
 }
 
 async function updateRegionalCards() {
@@ -2324,12 +2330,13 @@ async function updateRegionalCards() {
                     // Update weather details
                     const details = card.querySelectorAll('.detail-item span');
                     if (details.length >= 3) {
-                        details[0].textContent = `${Math.round(env.temperature)}Â°C`;
+                        details[0].textContent = `${Math.round(env.temperature)}°C`;
                         details[1].textContent = `${Math.round(env.humidity)}%`;
                         details[2].textContent = `${Math.round(env.wind_speed)} km/h`;
                     }
                 }
             });
+            updateElementText('last-sync-time', `Last synced: ${new Date().toLocaleTimeString()}`);
         }
     } catch (error) {
         console.warn('Error updating regional cards:', error);
@@ -2344,21 +2351,17 @@ async function updateEnvironmentalData() {
 
         if (data.success && data.prediction && data.prediction.environmental_data) {
             const env = data.prediction.environmental_data;
-            updateElementText('wind-speed', `${Math.round(env.wind_speed)} km/h`);
-            updateElementText('temperature', `${Math.round(env.temperature)}Â°C`);
-            updateElementText('humidity', `${Math.round(env.humidity)}%`);
+            updateElementText('live-wind', `${Math.round(env.wind_speed)} km/h`);
+            updateElementText('live-temp', `${Math.round(env.temperature)}°C`);
+            updateElementText('live-humidity', `${Math.round(env.humidity)}%`);
             updateElementText('wind-direction', env.wind_direction);
 
             // Update accuracy based on AI confidence
             if (data.prediction.prediction && data.prediction.prediction.confidence) {
                 const confidence = data.prediction.prediction.confidence * 100;
-                const accuracyElements = document.querySelectorAll('.stat-number');
-                accuracyElements.forEach(el => {
-                    if (el.nextElementSibling && el.nextElementSibling.textContent.includes('Accuracy')) {
-                        el.textContent = confidence.toFixed(1) + '%';
-                    }
-                });
+                updateElementText('live-accuracy', confidence.toFixed(1) + '%');
             }
+            updateElementText('last-sync-time', `Last synced: ${new Date().toLocaleTimeString()}`);
         }
     } catch (error) {
         console.warn('Falling back to local simulation for environmental data');
@@ -2366,9 +2369,9 @@ async function updateEnvironmentalData() {
         const temperature = Math.floor(Math.random() * 15) + 25;
         const humidity = Math.floor(Math.random() * 40) + 30;
 
-        updateElementText('wind-speed', `${windSpeed} km/h`);
-        updateElementText('temperature', `${temperature}Â°C`);
-        updateElementText('humidity', `${humidity}%`);
+        updateElementText('live-wind', `${windSpeed} km/h`);
+        updateElementText('live-temp', `${temperature}°C`);
+        updateElementText('live-humidity', `${humidity}%`);
 
         const directions = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
         const randomDirection = directions[Math.floor(Math.random() * directions.length)];
@@ -8294,4 +8297,5 @@ async function updateDashboardExplainability() {
     } catch (error) {
         console.error('Error fetching AI explainability:', error);
     }
+}
 }

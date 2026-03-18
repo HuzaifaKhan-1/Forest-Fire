@@ -9987,3 +9987,25 @@ body::after {
     }
 }
 
+/* Real-time Hazard Visuals */
+.hotspot-pulse {
+    animation: hotspotHighIntensity 1.5s infinite alternate;
+    stroke-width: 4px !important;
+    stroke: #ff0000 !important;
+}
+
+@keyframes hotspotHighIntensity {
+    0% {
+        fill-opacity: 0.4;
+        filter: drop-shadow(0 0 5px #ff0000);
+    }
+    100% {
+        fill-opacity: 0.8;
+        filter: drop-shadow(0 0 20px #ff0000);
+    }
+}
+
+.risk-zone-polygon {
+    transition: all 0.5s ease;
+}
+
